@@ -293,6 +293,8 @@ struct dri2_egl_surface
    __DRIimage *dri_image_back;
    __DRIimage *dri_image_front;
 
+   int                 back_buffer_age;
+
    /* EGL-owned buffers */
    __DRIbuffer           *local_buffers[__DRI_BUFFER_COUNT];
 #endif

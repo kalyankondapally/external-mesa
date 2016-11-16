@@ -439,6 +439,8 @@ get_back_bo(struct dri2_egl_surface *dri2_surf)
    if (!dri2_surf->dri_image_back)
       return -1;
 
+   dri2_surf->back_buffer_age = 1;
+
    return 0;
 }
 
@@ -535,6 +537,9 @@ droid_swap_buffers(_EGLDriver *drv, _EGLDisplay *disp, _EGLSurface *draw)
    if (dri2_surf->base.Type != EGL_WINDOW_BIT)
       return EGL_TRUE;
 
+   if (dri2_surf->back_buffer_age > 0)
+      dri2_surf->back_buffer_age++;
+
    dri2_flush_drawable_for_swapbuffers(disp, draw);
 
    if (dri2_surf->buffer)
@@ -542,7 +547,23 @@ droid_swap_buffers(_EGLDriver *drv, _EGLDisplay *disp, _EGLSurface *draw)
 
    (*dri2_dpy->flush->invalidate)(dri2_surf->dri_drawable);
 
+   dri2_surf->back_buffer_age = 1;
+
    return EGL_TRUE;
+}
+
+static EGLint
+droid_query_buffer_age(_EGLDriver *drv,
+                       _EGLDisplay *disp, _EGLSurface *surface)
+{
+   struct dri2_egl_surface *dri2_surf = dri2_egl_surface(surface);
+
+   if (get_back_bo(dri2_surf) < 0) {
+      _eglError(EGL_BAD_ALLOC, "dri2_query_buffer_age");
+      return 0;
+   }
+
+   return dri2_surf->back_buffer_age;
 }
 
 static _EGLImage *
@@ -968,7 +989,7 @@ static struct dri2_egl_display_vtbl droid_display_vtbl = {
    .swap_buffers_region = dri2_fallback_swap_buffers_region,
    .post_sub_buffer = dri2_fallback_post_sub_buffer,
    .copy_buffers = dri2_fallback_copy_buffers,
-   .query_buffer_age = dri2_fallback_query_buffer_age,
+   .query_buffer_age = droid_query_buffer_age,
    .query_surface = droid_query_surface,
    .create_wayland_buffer_from_image = dri2_fallback_create_wayland_buffer_from_image,
    .get_sync_values = dri2_fallback_get_sync_values,
@@ -1059,6 +1080,7 @@ dri2_initialize_android(_EGLDriver *drv, _EGLDisplay *dpy)
    dpy->Extensions.ANDROID_framebuffer_target = EGL_TRUE;
    dpy->Extensions.ANDROID_image_native_buffer = EGL_TRUE;
    dpy->Extensions.ANDROID_recordable = EGL_TRUE;
+   dpy->Extensions.EXT_buffer_age = EGL_TRUE;
 
    /* Fill vtbl last to prevent accidentally calling virtual function during
     * initialization.
